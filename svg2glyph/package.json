@@ -1,0 +1,14 @@
+{
+  "name": "svg2glyph",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "svg2glyph": "./svg2glyph.mjs"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "fast-xml-parser": "^4.5.0",
+    "svg-path-properties": "^1.0.13",
+    "zod": "^3.23.8"
+  }
+}
