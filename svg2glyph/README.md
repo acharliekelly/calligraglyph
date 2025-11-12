@@ -9,10 +9,10 @@ Convert SVG calligraphy guide into animated glyph
 ## Usage
 
 ### Basic:
-`./svg2glyph.mjs input.svg`
+`./svg2glyph.mjs ./uploads/sample_C.svg`
 
 ### Custom metadata and output:
-`./svg2glyph.mjs input.svg \
+`./svg2glyph.mjs ./uploads/sample_C.svg \
   --style gothic --char C --case upper \
   --nib-width 60 --nib-angle 35 \
   --baseline 800 --xheight 500 --ascender 900 --descender 150 \
