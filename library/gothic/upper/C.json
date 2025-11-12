@@ -1,5 +1,5 @@
 {
-  "schema": "kaligraf/v1",
+  "schema": "calligraglyph/v1",
   "id": "gothic/C/cap/v1",
   "style": "gothic",
   "char": "C",

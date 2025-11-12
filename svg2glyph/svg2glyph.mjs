@@ -50,7 +50,7 @@ const GlyphSchema = z.object({
 const program = new Command();
 program
   .name("calligraglyph")
-  .description("Convert an ordered SVG of per-stroke paths into calliform glyph JSON.")
+  .description("Convert an ordered SVG of per-stroke paths into Calligraphorm glyph JSON.")
   .argument("<input.svg>", "Input SVG file")
   .option("-o, --out <file.json>", "Output JSON path (defaults to <input>.json)")
   .option("--style <style>", "Style name (e.g., gothic)", "gothic")
@@ -69,6 +69,28 @@ program
   .parse(process.argv);
 
 const opts = program.opts();
+
+// after: const opts = program.opts();
+
+function num(val, dflt) {
+  const n = Number(val);
+  return Number.isFinite(n) ? n : dflt;
+}
+
+// Commander maps --nib-width -> opts.nibWidth, --min-dur -> opts.minDur, etc.
+const nibWidth   = num(opts.nibWidth, 60);
+const nibAngle   = num(opts.nibAngle, 35);
+const baseline   = num(opts.baseline, 800);
+const xHeight    = num(opts.xheight, 500);   // flag is --xheight (lowercase 'h')
+const ascender   = num(opts.ascender, 900);
+const descender  = num(opts.descender, 150);
+
+const speedK     = num(opts.speed, 1.2);
+const minDur     = num(opts.minDur, 280);
+const maxDur     = num(opts.maxDur, 1600);
+const delayMs    = num(opts.delay, 60);
+
+
 const [inputPath] = program.args;
 if (!inputPath) {
   console.error("No input provided.");
@@ -161,20 +183,17 @@ const hasExplicit = enriched.some(e => e.order !== Infinity);
 const ordered = hasExplicit ? enriched : enriched.map((e, i) => ({ ...e, order: i + 1 }));
 
 // Timing model
-const k = Number(opts.speed);
-const minDur = Number(opts["min-dur"]);
-const maxDur = Number(opts["max-dur"]);
-const delay = Number(opts.delay);
+// timing model (replace old k/minDur/maxDur/delay vars)
 function clamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
 
 const strokes = ordered.map((s, i) => {
-  const durationMs = clamp(minDur, maxDur, Math.round(s.length * k));
+  const durationMs = clamp(minDur, maxDur, Math.round(s.length * speedK));
   return {
     id: s.id,
     order: i + 1,
     path: s.d,
     durationMs,
-    delayMs: i === 0 ? 0 : delay
+    delayMs: i === 0 ? 0 : delayMs
   };
 });
 
@@ -187,18 +206,19 @@ const glyph = {
   bbox: {
     w: Number.isFinite(vw) && vw > 0 ? vw : 1000,
     h: Number.isFinite(vh) && vh > 0 ? vh : 1000,
-    baseline: Number(opts.baseline),
-    xHeight: Number(opts.xheight),
-    ascender: Number(opts.ascender),
-    descender: Number(opts.descender)
+    baseline,
+    xHeight,
+    ascender,
+    descender
   },
   nib: {
-    width: Number(opts["nib-width"]),
-    angleDeg: Number(opts["nib-angle"])
+    width: nibWidth,
+    angleDeg: nibAngle
   },
   strokes,
   attribution: { source: path.basename(inputPath) }
 };
+
 
 const res = GlyphSchema.safeParse(glyph);
 if (!res.success) {

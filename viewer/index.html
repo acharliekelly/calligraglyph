@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>calliform Glyph Viewer</title>
+  <title>Calligraphorm Glyph Viewer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <style>
     body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
@@ -20,7 +20,7 @@
   </style>
 </head>
 <body>
-  <h1>calliform Glyph Viewer</h1>
+  <h1>Calligraphorm Glyph Viewer</h1>
   <p class="badge">Drop JSON below or use sample → Load Sample</p>
 
   <div class="row">
@@ -172,7 +172,7 @@
 
       const loadSample = () => {
         const sample = {
-          "schema": "calliform/v1",
+          "schema": "calligraphorm/v1",
           "id": "gothic/C/upper/v1",
           "style": "gothic",
           "char": "C",
@@ -195,7 +195,7 @@
         try {
           const j = JSON.parse(document.getElementById("json").value);
           // ultra-light validation
-          if (j.schema !== "calliform/v1" || !Array.isArray(j.strokes)) throw new Error("Invalid schema");
+          if (j.schema !== "calligraphorm/v1" || !Array.isArray(j.strokes)) throw new Error("Invalid schema");
           setGlyph(j);
           setPaused(true);
         } catch (e) {
@@ -257,7 +257,7 @@
           const api = {
             loadSample: () => {
               const sample = {
-                "schema": "calliform/v1",
+                "schema": "calligraglyph/v1",
                 "id": "gothic/C/upper/v1",
                 "style": "gothic",
                 "char": "C",

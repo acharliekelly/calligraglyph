@@ -1,5 +1,5 @@
-# SVG 2 GLYPH
-Convert SVG calligraphy guide into animated glyph
+# CalligraGlyph
+Convert SVG calligraphy letter stroke guide into animated glyph
 
 ## Installation
 `npm i`
