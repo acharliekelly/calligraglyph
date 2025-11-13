@@ -1,0 +1,45 @@
+{
+  "schema": "calligraglyph/v1",
+  "id": "basic/C/upper/v1",
+  "style": "basic",
+  "char": "C",
+  "case": "upper",
+  "bbox": {
+    "w": 1000,
+    "h": 1000,
+    "baseline": 800,
+    "xHeight": 500,
+    "ascender": 900,
+    "descender": 150
+  },
+  "nib": {
+    "width": 60,
+    "angleDeg": 35
+  },
+  "strokes": [
+    {
+      "id": "01_stem",
+      "order": 1,
+      "path": "M780,210 C560,210 420,310 360,480 C320,590 320,700 420,780 C510,850 620,840 730,820",
+      "durationMs": 1600,
+      "delayMs": 0
+    },
+    {
+      "id": "02_topHook",
+      "order": 2,
+      "path": "M780,210 C860,250 900,320 900,390",
+      "durationMs": 1600,
+      "delayMs": 60
+    },
+    {
+      "id": "03_bottomHook",
+      "order": 3,
+      "path": "M900,640 C900,720 860,790 730,820",
+      "durationMs": 1600,
+      "delayMs": 60
+    }
+  ],
+  "attribution": {
+    "source": "sample_C.svg"
+  }
+}
