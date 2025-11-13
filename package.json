@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "build": "pnpm -r --filter ./packages/... run build",
+    "dev": "pnpm --filter @calligraglyph/viewer-web dev",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "preview": "pnpm --filter @calligraglyph/viewer-web preview"
+  },
+  "private": true,
+  "workspaces": ["packages/*", "packages/data/*", "apps/*"]
+}

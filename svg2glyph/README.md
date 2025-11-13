@@ -13,8 +13,8 @@ Convert SVG calligraphy letter stroke guide into animated glyph
 
 ### Custom metadata and output:
 `./svg2glyph.mjs ./uploads/sample_C.svg \
-  --style gothic --char C --case upper \
+  --style basic --char C --case upper \
   --nib-width 60 --nib-angle 35 \
   --baseline 800 --xheight 500 --ascender 900 --descender 150 \
   --speed 1.2 --min-dur 280 --max-dur 1600 --delay 60 \
-  -o C_gothic.json`
+  -o ./uploads/C_basic.json`

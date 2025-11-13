@@ -1,0 +1,14 @@
+{
+  "name": "@calligraglyph/cli",
+  "bin": { "cg": "./dist/index.js" },
+  "type": "module",
+  "scripts": { "build": "tsc -p tsconfig.json" },
+  "dependencies": {
+    "@calligraglyph/core": "workspace:*",
+    "commander": "^12",
+    "fast-xml-parser": "^4",
+    "svg-path-properties": "^1",
+    "globby": "^14",
+    "zod": "^3"
+  }
+}

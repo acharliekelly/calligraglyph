@@ -2,46 +2,50 @@
 <html>
 <head>
   <meta charset="utf-8"/>
-  <title>Calligraphorm Glyph Viewer</title>
+  <title>CalligraGlyph Viewer (Simple)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <style>
-    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; }
-    #stage { width: 520px; height: 520px; border: 1px solid #e5e7eb; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #fff; }
-    svg { width: 500px; height: 500px; }
-    textarea { width: 520px; height: 220px; }
-    button { padding: 8px 12px; border-radius: 8px; border: 1px solid #ddd; background: #fafafa; cursor: pointer; }
-    button:disabled { opacity: 0.5; cursor: default; }
-    label { font-size: 12px; color: #555; }
-    .controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .badge { background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
-    .row > .card { flex: 1 1 520px; }
+    :root { --b:#111; --muted:#6b7280; --line:#e5e7eb; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 16px; color:#111; }
+    .wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 1100px) { .wrap { grid-template-columns: 1fr; } }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; background: #fff; }
+    #stage { width: 100%; display: flex; align-items: center; justify-content: center; border: 1px dashed var(--line); border-radius: 12px; aspect-ratio: 1/1; background: #fff; }
+    svg { width: 100%; height: 100%; }
+    textarea { width: 100%; height: 320px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; font-size: 12px; }
+    .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+    button, input[type="number"] {
+      padding: 8px 12px; border-radius: 8px; border: 1px solid #d1d5db; background: #fafafa; cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    .meta { color: var(--muted); font-size: 12px; margin-left: 8px; }
+    .badge { background: #eef2ff; color: #3730a3; border-radius: 999px; padding: 2px 8px; font-size: 12px; display: inline-block; }
+    .row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
   </style>
 </head>
 <body>
-  <h1>Calligraphorm Glyph Viewer</h1>
-  <p class="badge">Drop JSON below or use sample → Load Sample</p>
+  <h1>Kaligraf Glyph Viewer</h1>
+  <p class="badge">Paste JSON from the CLI → Apply → Play</p>
 
-  <div class="row">
+  <div class="wrap">
     <div class="card">
-      <div class="controls" style="margin-bottom:8px;">
-        <button id="loadSample">Load Sample</button>
+      <div class="row" style="margin-bottom:8px;">
         <input type="file" id="file" accept=".json" />
+        <button id="loadSample">Load Sample</button>
         <button id="apply">Apply JSON</button>
-        <label>Speed × <input type="number" id="speed" value="1.0" min="0.25" max="4" step="0.05" style="width:60px"/></label>
+        <label>Speed × <input type="number" id="speed" value="1.0" min="0.25" max="4" step="0.05" style="width:70px"/></label>
       </div>
-      <textarea id="json"></textarea>
+      <textarea id="json" placeholder="Paste glyph JSON here..."></textarea>
     </div>
 
     <div class="card">
-      <div id="stage"></div>
-      <div class="controls" style="margin-top:8px;">
-        <button id="play">Play</button>
-        <button id="pause">Pause</button>
-        <button id="reset">Reset</button>
-        <button id="step">Step</button>
-        <span id="meta"></span>
+      <div id="stage"><em>Load JSON to preview</em></div>
+      <div class="controls">
+        <button id="play" disabled>Play</button>
+        <button id="pause" disabled>Pause</button>
+        <button id="reset" disabled>Reset</button>
+        <button id="step" disabled>Step</button>
+        <span class="meta" id="meta"></span>
       </div>
     </div>
   </div>
@@ -49,290 +53,217 @@
   <!-- React via CDN -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <script type="text/babel">
-    const { useRef, useEffect, useState } = React;
+  <script>
+    const { useRef, useEffect, useState, useMemo } = React;
 
-    function clamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
-
-    function GlyphPlayer({ glyph, speed = 1.0, paused, stepToken }) {
+    function GlyphPlayer({ glyph, speed = 1.0, paused, stepSignal }) {
       const groupRef = useRef(null);
-      const [lengths, setLengths] = useState([]);
-      const [dashReady, setDashReady] = useState(false);
-      const [progress, setProgress] = useState(0); // 0..strokes.length
-      const rafRef = useRef(null);
-      const tRef = useRef({ index: 0, t0: 0, elapsed: 0 });
+      const [ready, setReady] = useState(false);
 
-      // Prepare dash arrays once paths are in DOM
+      const sortedStrokes = useMemo(
+        () => [...glyph.strokes].sort((a,b)=>a.order-b.order),
+        [glyph]
+      );
+
+      // Prepare dash arrays when paths mount
       useEffect(() => {
-        if (!groupRef.current) return;
-        const els = Array.from(groupRef.current.querySelectorAll("path"));
-        const arr = els.map(el => {
-          const L = el.getTotalLength();
-          el.style.strokeDasharray = `${L}`;
-          el.style.strokeDashoffset = `${L}`;
-          el.style.transition = "none";
-          return L;
+        const g = groupRef.current;
+        if (!g) return;
+        const els = Array.from(g.querySelectorAll("path"));
+        els.forEach(el => {
+          try {
+            const L = el.getTotalLength();
+            el.style.strokeDasharray = `${L}`;
+            el.style.strokeDashoffset = `${L}`;
+            el.style.transition = "none";
+          } catch { /* ignore */ }
         });
-        setLengths(arr);
-        setDashReady(true);
-        setProgress(0);
-        tRef.current = { index: 0, t0: 0, elapsed: 0 };
+        setReady(true);
       }, [glyph]);
 
-      // Reset
-      useEffect(() => {
-        if (!dashReady) return;
-        const els = Array.from(groupRef.current.querySelectorAll("path"));
-        els.forEach((el,i) => {
-          el.style.transition = "none";
-          el.style.strokeDashoffset = `${lengths[i] ?? 0}`;
+      // Reset helper
+      const resetAll = () => {
+        const g = groupRef.current;
+        if (!g) return;
+        const els = Array.from(g.querySelectorAll("path"));
+        els.forEach(el => {
+          try {
+            const L = el.getTotalLength();
+            el.style.transition = "none";
+            el.style.strokeDashoffset = `${L}`;
+          } catch {}
         });
-        cancelAnimationFrame(rafRef.current);
-        setProgress(0);
-        tRef.current = { index: 0, t0: 0, elapsed: 0 };
-      }, [dashReady, stepToken === -1]);
+      };
 
-      // Step one stroke
+      // Imperative play sequence
       useEffect(() => {
-        if (!dashReady || stepToken <= 0) return;
-        const i = tRef.current.index;
-        if (i >= glyph.strokes.length) return;
-        const s = glyph.strokes[i];
-        const el = groupRef.current.querySelector(`#${s.id}`);
-        if (!el) return;
-        const dur = s.durationMs / speed;
-        const L = el.getTotalLength();
-        el.style.transition = `stroke-dashoffset ${dur}ms linear`;
-        el.style.strokeDashoffset = "0";
-        setTimeout(() => {
-          tRef.current.index = i + 1;
-          setProgress(i + 1);
-        }, dur + (s.delayMs ?? 0)/speed);
-      }, [stepToken]);
+        if (!ready) return;
+        if (paused) return;
 
-      // Play loop
-      useEffect(() => {
-        if (!dashReady) return;
-        if (paused) { cancelAnimationFrame(rafRef.current); return; }
+        let cancelled = false;
+        const g = groupRef.current;
 
-        const els = Array.from(groupRef.current.querySelectorAll("path"));
-        const strokes = [...glyph.strokes].sort((a,b)=>a.order-b.order);
+        const playStroke = (i) => {
+          if (cancelled || i >= sortedStrokes.length) return;
+          const s = sortedStrokes[i];
+          const el = g.querySelector(`#${CSS.escape(s.id)}`);
+          if (!el) { playStroke(i+1); return; }
 
-        function playStroke(i) {
-          if (i >= strokes.length) return;
-          const s = strokes[i];
-          const el = groupRef.current.querySelector(`#${s.id}`);
-          if (!el) return;
+          const L = el.getTotalLength?.() ?? 0;
+          const dur = (s.durationMs || 400) / speed;
+          const delay = (s.delayMs || 0) / speed;
 
-          const dur = s.durationMs / speed;
-          const L = el.getTotalLength();
           // reset current path
           el.style.transition = "none";
           el.style.strokeDashoffset = `${L}`;
-          // small reflow
-          el.getBoundingClientRect();
+          void el.getBoundingClientRect(); // reflow
+
           // animate
           el.style.transition = `stroke-dashoffset ${dur}ms linear`;
           el.style.strokeDashoffset = "0";
 
-          setTimeout(() => {
-            setProgress(i + 1);
-            if (!paused) playStroke(i + 1);
-          }, dur + (s.delayMs ?? 0)/speed);
-        }
+          setTimeout(() => { if (!cancelled) playStroke(i+1); }, dur + delay);
+        };
 
-        playStroke(tRef.current.index);
-        return () => cancelAnimationFrame(rafRef.current);
-      }, [paused, speed, dashReady, glyph]);
+        // Start fresh each play
+        resetAll();
+        playStroke(0);
+        return () => { cancelled = true; };
+      }, [paused, speed, ready, sortedStrokes]);
+
+      // Step one stroke at a time
+      useEffect(() => {
+        if (!ready || stepSignal <= 0) return;
+        const i = stepSignal - 1; // external sends 1..N
+        if (i >= sortedStrokes.length) return;
+        const g = groupRef.current;
+        const s = sortedStrokes[i];
+        const el = g.querySelector(`#${CSS.escape(s.id)}`);
+        if (!el) return;
+
+        const L = el.getTotalLength?.() ?? 0;
+        const dur = (s.durationMs || 400) / speed;
+
+        el.style.transition = "none";
+        el.style.strokeDashoffset = `${L}`;
+        void el.getBoundingClientRect();
+        el.style.transition = `stroke-dashoffset ${dur}ms linear`;
+        el.style.strokeDashoffset = "0";
+      }, [stepSignal, ready, speed, sortedStrokes]);
 
       const vb = `0 0 ${glyph.bbox.w} ${glyph.bbox.h}`;
+      const strokeWidth = 28; // you can compute from glyph.nib later
 
       return (
-        <svg viewBox={vb} xmlns="http://www.w3.org/2000/svg">
-          <g ref={groupRef} fill="none" stroke="#111" strokeWidth="28" strokeLinecap="round" strokeLinejoin="round">
-            {glyph.strokes
-              .sort((a,b)=>a.order-b.order)
-              .map((s, idx) => (
-                <path id={s.id} key={s.id} d={s.path}/>
-              ))}
-          </g>
-        </svg>
+        React.createElement('svg', { viewBox: vb, xmlns: "http://www.w3.org/2000/svg" },
+          React.createElement('g', { ref: groupRef, fill: "none", stroke: "#111", strokeWidth, strokeLinecap:"round", strokeLinejoin:"round" },
+            sortedStrokes.map(s => React.createElement('path', { id: s.id, key: s.id, d: s.path }))
+          )
+        )
       );
     }
 
-    function App() {
+    function AppRoot() {
       const [glyph, setGlyph] = useState(null);
       const [paused, setPaused] = useState(true);
       const [speed, setSpeed] = useState(1.0);
-      const [stepToken, setStepToken] = useState(0);
+      const [stepCount, setStepCount] = useState(0);
 
-      const meta = glyph ? `${glyph.style} • ${glyph.case} ${glyph.char} • ${glyph.strokes.length} strokes` : "";
+      useEffect(() => {
+        const file = document.getElementById("file");
+        const apply = document.getElementById("apply");
+        const loadSample = document.getElementById("loadSample");
+        const speedInp = document.getElementById("speed");
+        const playBtn = document.getElementById("play");
+        const pauseBtn = document.getElementById("pause");
+        const resetBtn = document.getElementById("reset");
+        const stepBtn = document.getElementById("step");
+        const jsonTA = document.getElementById("json");
+        const meta = document.getElementById("meta");
 
-      const loadSample = () => {
-        const sample = {
-          "schema": "calligraphorm/v1",
-          "id": "gothic/C/upper/v1",
-          "style": "gothic",
-          "char": "C",
-          "case": "upper",
-          "bbox": { "w": 1000, "h": 1000, "baseline": 800, "xHeight": 500, "ascender": 900, "descender": 150 },
-          "nib": { "width": 60, "angleDeg": 35 },
-          "strokes": [
-            { "id": "s1", "order": 1, "path": "M780,210 C560,210 420,310 360,480 C320,590 320,700 420,780 C510,850 620,840 730,820", "durationMs": 700, "delayMs": 0 },
-            { "id": "s2", "order": 2, "path": "M780,210 C860,250 900,320 900,390", "durationMs": 420, "delayMs": 60 },
-            { "id": "s3", "order": 3, "path": "M900,640 C900,720 860,790 730,820", "durationMs": 520, "delayMs": 60 }
-          ],
-          "attribution": { "source": "sample" }
-        };
-        document.getElementById("json").value = JSON.stringify(sample, null, 2);
-        setGlyph(sample);
-        setPaused(true);
-      };
-
-      const applyJson = () => {
-        try {
-          const j = JSON.parse(document.getElementById("json").value);
-          // ultra-light validation
-          if (j.schema !== "calligraphorm/v1" || !Array.isArray(j.strokes)) throw new Error("Invalid schema");
-          setGlyph(j);
-          setPaused(true);
-        } catch (e) {
-          alert("Invalid JSON: " + e.message);
+        function updateButtons() {
+          const enabled = !!glyph;
+          playBtn.disabled = !(enabled && paused);
+          pauseBtn.disabled = !(enabled && !paused);
+          resetBtn.disabled = !enabled;
+          stepBtn.disabled = !enabled;
+          meta.textContent = glyph ? `${glyph.style} • ${glyph.case} ${glyph.char} • ${glyph.strokes.length} strokes` : '';
         }
-      };
+        updateButtons();
 
-      const onFile = async (e) => {
-        const f = e.target.files?.[0];
-        if (!f) return;
-        const txt = await f.text();
-        document.getElementById("json").value = txt;
-        applyJson();
-      };
+        async function onFile(e) {
+          const f = e.target.files?.[0];
+          if (!f) return;
+          const txt = await f.text();
+          jsonTA.value = txt;
+          applyJson();
+        }
+        function applyJson() {
+          try {
+            const j = JSON.parse(jsonTA.value);
+            if (!j?.strokes?.length || !j?.bbox) throw new Error("Missing strokes/bbox");
+            setGlyph(j);
+            setPaused(true);
+            setStepCount(0);
+          } catch (err) {
+            alert("Invalid JSON: " + err.message);
+          }
+        }
+        function loadSampleJson() {
+          const sample = {
+            "schema":"kaligraf/v1","id":"gothic/C/upper/v1","style":"gothic","char":"C","case":"upper",
+            "bbox":{"w":1000,"h":1000,"baseline":800,"xHeight":500,"ascender":900,"descender":150},
+            "nib":{"width":60,"angleDeg":35},
+            "strokes":[
+              {"id":"s1","order":1,"path":"M780,210 C560,210 420,310 360,480 C320,590 320,700 420,780 C510,850 620,840 730,820","durationMs":700,"delayMs":0},
+              {"id":"s2","order":2,"path":"M780,210 C860,250 900,320 900,390","durationMs":420,"delayMs":60},
+              {"id":"s3","order":3,"path":"M900,640 C900,720 860,790 730,820","durationMs":520,"delayMs":60}
+            ]
+          };
+          const txt = JSON.stringify(sample, null, 2);
+          jsonTA.value = txt;
+          applyJson();
+        }
+        function play() { setPaused(false); }
+        function pause() { setPaused(true); }
+        function reset() { setPaused(true); setStepCount(0); /* player resets on new stepSignal=0 via rerender */ }
+        function step() { setPaused(true); if (glyph) setStepCount(c => Math.min(c+1, glyph.strokes.length)); }
+        function onSpeed(e) { const v = Number(e.target.value); setSpeed(Number.isFinite(v)?v:1.0); }
 
-      const play = () => { setPaused(false); };
-      const pause = () => { setPaused(true); };
-      const reset = () => { setPaused(true); setStepToken(-1); setTimeout(()=>setStepToken(0), 0); };
-      const step = () => { setPaused(true); setStepToken(t => t + 1); };
+        file.addEventListener("change", onFile);
+        apply.addEventListener("click", () => applyJson());
+        loadSample.addEventListener("click", loadSampleJson);
+        playBtn.addEventListener("click", play);
+        pauseBtn.addEventListener("click", pause);
+        resetBtn.addEventListener("click", reset);
+        stepBtn.addEventListener("click", step);
+        speedInp.addEventListener("change", onSpeed);
 
-      return (
-        <>
-          <div id="stage">
-            {glyph ? <GlyphPlayer glyph={glyph} speed={speed} paused={paused} stepToken={stepToken}/> : <em>Load a glyph JSON to preview</em>}
-          </div>
-          <div className="controls" style={{marginTop:8}}>
-            <button id="play" onClick={play} disabled={!glyph || !paused}>Play</button>
-            <button id="pause" onClick={pause} disabled={!glyph || paused}>Pause</button>
-            <button id="reset" onClick={reset} disabled={!glyph}>Reset</button>
-            <button id="step" onClick={step} disabled={!glyph}>Step</button>
-            <span id="meta" style={{marginLeft:8}}>{meta}</span>
-          </div>
-        </>
+        return () => {
+          file.removeEventListener("change", onFile);
+          apply.removeEventListener("click", applyJson);
+          loadSample.removeEventListener("click", loadSampleJson);
+          playBtn.removeEventListener("click", play);
+          pauseBtn.removeEventListener("click", pause);
+          resetBtn.removeEventListener("click", reset);
+          stepBtn.removeEventListener("click", step);
+          speedInp.removeEventListener("change", onSpeed);
+        };
+      }, [glyph, paused]);
+
+      return React.createElement(
+        React.Fragment,
+        null,
+        glyph
+          ? React.createElement(GlyphPlayer, { glyph, speed, paused, stepSignal: stepCount })
+          : React.createElement('em', null, 'Load JSON to preview')
       );
     }
 
-    ReactDOM.createRoot(document.getElementById("stage")).render(<App />);
-    document.getElementById("loadSample").addEventListener("click", () => {
-      const evt = new Event("click"); // noop; handled inside App
-    });
-    // Bridge DOM buttons to React handlers by re-rendering; simpler: attach here:
-    window.addEventListener("DOMContentLoaded", () => {
-      const file = document.getElementById("file");
-      const apply = document.getElementById("apply");
-      const speed = document.getElementById("speed");
-      const loadSampleBtn = document.getElementById("loadSample");
-
-      // Tiny internal state hook via closures:
-      let appRef = null;
-      // Re-render root with lifted handlers so we can wire DOM events
-      const mount = () => {
-        function Wrapper() {
-          const [jsonStr, setJsonStr] = React.useState("");
-          const [glyph, setGlyph] = React.useState(null);
-          const [paused, setPaused] = React.useState(true);
-          const [sp, setSp] = React.useState(1.0);
-          const [stepToken, setStepToken] = React.useState(0);
-
-          const api = {
-            loadSample: () => {
-              const sample = {
-                "schema": "calligraglyph/v1",
-                "id": "gothic/C/upper/v1",
-                "style": "gothic",
-                "char": "C",
-                "case": "upper",
-                "bbox": { "w": 1000, "h": 1000, "baseline": 800, "xHeight": 500, "ascender": 900, "descender": 150 },
-                "nib": { "width": 60, "angleDeg": 35 },
-                "strokes": [
-                  { "id": "s1", "order": 1, "path": "M780,210 C560,210 420,310 360,480 C320,590 320,700 420,780 C510,850 620,840 730,820", "durationMs": 700, "delayMs": 0 },
-                  { "id": "s2", "order": 2, "path": "M780,210 C860,250 900,320 900,390", "durationMs": 420, "delayMs": 60 },
-                  { "id": "s3", "order": 3, "path": "M900,640 C900,720 860,790 730,820", "durationMs": 520, "delayMs": 60 }
-                ],
-                "attribution": { "source": "sample" }
-              };
-              const txt = JSON.stringify(sample, null, 2);
-              document.getElementById("json").value = txt;
-              setJsonStr(txt);
-              setGlyph(sample);
-              setPaused(true);
-            },
-            applyJson: () => {
-              try {
-                const j = JSON.parse(document.getElementById("json").value);
-                setGlyph(j);
-                setPaused(true);
-              } catch (e) { alert("Invalid JSON: " + e.message); }
-            },
-            onFile: async (file) => {
-              const txt = await file.text();
-              document.getElementById("json").value = txt;
-              setJsonStr(txt);
-              api.applyJson();
-            },
-            setSpeed: (v) => setSp(v),
-            play: () => setPaused(false),
-            pause: () => setPaused(true),
-            reset: () => { setPaused(true); setStepToken(-1); setTimeout(()=>setStepToken(0),0); },
-            step: () => { setPaused(true); setStepToken(t=>t+1); }
-          };
-          appRef = api;
-
-          const meta = glyph ? `${glyph.style} • ${glyph.case} ${glyph.char} • ${glyph.strokes.length} strokes` : "";
-
-          return (
-            <>
-              <div id="stageInner">
-                {glyph ? <GlyphPlayer glyph={glyph} speed={sp} paused={paused} stepToken={stepToken}/> : <em>Load a glyph JSON to preview</em>}
-              </div>
-              <div className="controls" style={{marginTop:8}}>
-                <button onClick={api.play} disabled={!glyph || !paused}>Play</button>
-                <button onClick={api.pause} disabled={!glyph || paused}>Pause</button>
-                <button onClick={api.reset} disabled={!glyph}>Reset</button>
-                <button onClick={api.step} disabled={!glyph}>Step</button>
-                <span style={{marginLeft:8}}>{meta}</span>
-                <label style={{marginLeft:12}}>Speed × <input type="number" defaultValue={1.0} min={0.25} max={4} step={0.05} onChange={e => api.setSpeed(Number(e.target.value))} style={{width:"60px"}}/></label>
-              </div>
-            </>
-          );
-        }
-        ReactDOM.createRoot(document.getElementById("stage")).render(<Wrapper/>);
-      };
-
-      mount();
-
-      loadSampleBtn.addEventListener("click", () => appRef?.loadSample());
-      file.addEventListener("change", (e) => {
-        const f = e.target.files?.[0];
-        if (f) appRef?.onFile(f);
-      });
-      apply.addEventListener("click", () => appRef?.applyJson());
-      speed.addEventListener("change", (e) => appRef?.setSpeed(Number(e.target.value)));
-      document.getElementById("play").addEventListener("click", () => appRef?.play());
-      document.getElementById("pause").addEventListener("click", () => appRef?.pause());
-      document.getElementById("reset").addEventListener("click", () => appRef?.reset());
-      document.getElementById("step").addEventListener("click", () => appRef?.step());
-    });
+    // Mount React app into #stage
+    const root = ReactDOM.createRoot(document.getElementById("stage"));
+    root.render(React.createElement(AppRoot));
   </script>
 </body>
 </html>
