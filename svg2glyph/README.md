@@ -1,4 +1,4 @@
-# CalligraGlyph
+# SVG 2 Glyph
 Convert SVG calligraphy letter stroke guide into animated glyph
 
 ## Installation
