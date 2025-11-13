@@ -1,4 +1,4 @@
-# Calligraphorm
+# CalligraGlyph
 
 Look up calligraphic characters from anywhere.
 
